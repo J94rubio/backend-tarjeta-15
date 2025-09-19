@@ -11,17 +11,51 @@ const __dirname = path.dirname(__filename);
 const SCOPES = ['https://www.googleapis.com/auth/spreadsheets'];
 const SPREADSHEET_ID = '1PmYO433SJmqkh1G6wAHj7rABrZD3m9J3bDQEK9468Ns'; // ID de tu hoja de cálculo
 
-// Configuración de autenticación (usando Service Account)
-const auth = new google.auth.GoogleAuth({
-  keyFile: path.join(__dirname, 'credentials.json'), // Archivo de credenciales de Google
-  scopes: SCOPES,
-});
+// Configuración de autenticación (usando variables de entorno para producción)
+let auth;
+let sheets;
 
-const sheets = google.sheets({ version: 'v4', auth });
+function initializeGoogleAuth() {
+  try {
+    if (process.env.GOOGLE_SHEETS_PRIVATE_KEY && process.env.GOOGLE_SHEETS_CLIENT_EMAIL) {
+      // Usar variables de entorno (producción)
+      auth = new google.auth.GoogleAuth({
+        credentials: {
+          type: 'service_account',
+          project_id: process.env.GOOGLE_SHEETS_PROJECT_ID || 'tarjeta-15-project',
+          private_key_id: process.env.GOOGLE_SHEETS_PRIVATE_KEY_ID,
+          private_key: process.env.GOOGLE_SHEETS_PRIVATE_KEY.replace(/\\n/g, '\n'),
+          client_email: process.env.GOOGLE_SHEETS_CLIENT_EMAIL,
+          client_id: process.env.GOOGLE_SHEETS_CLIENT_ID,
+          auth_uri: 'https://accounts.google.com/o/oauth2/auth',
+          token_uri: 'https://accounts.google.com/o/oauth2/token',
+        },
+        scopes: SCOPES,
+      });
+    } else {
+      // Usar archivo local (desarrollo)
+      auth = new google.auth.GoogleAuth({
+        keyFile: path.join(__dirname, 'credentials.json'),
+        scopes: SCOPES,
+      });
+    }
+    
+    sheets = google.sheets({ version: 'v4', auth });
+    return true;
+  } catch (error) {
+    console.warn('⚠️ No se pudo inicializar Google Sheets:', error.message);
+    return false;
+  }
+}
 
 // Función para agregar una confirmación a Google Sheets
 async function addConfirmationToSheet(confirmationData) {
   try {
+    // Inicializar Google Auth si no está inicializado
+    if (!sheets && !initializeGoogleAuth()) {
+      throw new Error('Google Sheets no configurado correctamente');
+    }
+    
     const { nombre, telefono, asistencia, acompanantes } = confirmationData;
     
     // Preparar los datos para insertar
@@ -64,6 +98,11 @@ async function addConfirmationToSheet(confirmationData) {
 // Función para crear las cabeceras si la hoja está vacía
 async function initializeSheet() {
   try {
+    // Inicializar Google Auth si no está inicializado
+    if (!sheets && !initializeGoogleAuth()) {
+      throw new Error('Google Sheets no configurado correctamente');
+    }
+    
     const request = {
       spreadsheetId: SPREADSHEET_ID,
       range: 'Confirmaciones!A1:F1',
