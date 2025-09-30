@@ -117,7 +117,7 @@ app.get('/api/fotos', async (req, res) => {
     const photos = await collection
       .find({})
       .sort({ timestamp: -1 }) // Más recientes primero
-      .limit(50) // Máximo 50 fotos
+      .limit(1000) // Máximo 1000 fotos
       .toArray();
     
     // Convertir fotos para el frontend
